@@ -38,7 +38,7 @@ Placeholder spot for shared volumes with various Discourse containers. You may e
 
 Podmanfiles for Discourse; see [the README](image/README.md) for further details.
 
-The Podman repository will always contain the latest built version at: https://hub.podman.com/r/discourse/base/, you should not need to build the base image.
+The Podman repository will always contain the latest built version at: https://hub.docker.com/r/discourse/base/, you should not need to build the base image.
 
 ### Launcher
 

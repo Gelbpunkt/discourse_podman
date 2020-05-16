@@ -89,14 +89,9 @@ check_IP_match() {
 ## Do we have podman?
 ##
 check_and_install_podman () {
-  podman_path=`which podman.io || which podman`
+  podman_path=`which podman`
   if [ -z $podman_path ]; then
-    read  -p "Podman not installed. Enter to install from https://get.podman.com/ or Ctrl+C to exit"
-    curl https://get.podman.com/ | sh
-  fi
-  podman_path=`which podman.io || which podman`
-  if [ -z $podman_path ]; then
-    echo Podman install failed. Quitting.
+    echo Podman not installed. Quitting.
     exit
   fi
 }
