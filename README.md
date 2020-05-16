@@ -1,8 +1,8 @@
 ### About
 
-- [Docker](https://docker.com/) is an open source project to pack, ship and run any Linux application in a lighter weight, faster container than a traditional virtual machine.
+- [Podman](https://podman.com/) is an open source project to pack, ship and run any Linux application in a lighter weight, faster container than a traditional virtual machine.
 
-- Docker makes it much easier to deploy [a Discourse forum](https://github.com/discourse/discourse) on your servers and keep it updated. For background, see [Sam's blog post](http://samsaffron.com/archive/2013/11/07/discourse-in-a-docker-container).
+- Podman makes it much easier to deploy [a Discourse forum](https://github.com/discourse/discourse) on your servers and keep it updated. For background, see [Sam's blog post](http://samsaffron.com/archive/2013/11/07/discourse-in-a-podman-container).
 
 - The templates and base image configure Discourse with the Discourse team's recommended optimal defaults.
 
@@ -16,7 +16,7 @@ https://github.com/discourse/discourse/blob/master/docs/INSTALL-cloud.md
 
 #### `/cids`
 
-Contains container ids for currently running Docker containers. cids are Docker's "equivalent" of pids. Each container will have a unique git like hash.
+Contains container ids for currently running Podman containers. cids are Podman's "equivalent" of pids. Each container will have a unique git like hash.
 
 #### `/containers`
 
@@ -36,9 +36,9 @@ Placeholder spot for shared volumes with various Discourse containers. You may e
 
 #### `/image`
 
-Dockerfiles for Discourse; see [the README](image/README.md) for further details.
+Podmanfiles for Discourse; see [the README](image/README.md) for further details.
 
-The Docker repository will always contain the latest built version at: https://hub.docker.com/r/discourse/base/, you should not need to build the base image.
+The Podman repository will always contain the latest built version at: https://hub.podman.com/r/discourse/base/, you should not need to build the base image.
 
 ### Launcher
 
@@ -51,8 +51,8 @@ Commands:
     stop:       Stop a running container
     restart:    Restart a container
     destroy:    Stop and remove a container
-    enter:      Use docker exec to enter a container
-    logs:       Docker logs for container
+    enter:      Use podman exec to enter a container
+    logs:       Podman logs for container
     memconfig:  Configure sane defaults for available RAM
     bootstrap:  Bootstrap a container for the config based on a template
     rebuild:    Rebuild a container (destroy old, bootstrap, start new)
@@ -82,7 +82,7 @@ expose:
   - "127.0.0.1:20080:80"
 ```
 
-Publish port 22 inside the container on port 2222 on ALL local host interfaces. In order to bind to only one interface, you may specify the host's IP address as `([<host_interface>:[host_port]])|(<host_port>):<container_port>[/udp]` as defined in the [docker port binding documentation](http://docs.docker.com/userguide/dockerlinks/). To expose a port without publishing it, specify only the port number (e.g., `80`).
+Publish port 22 inside the container on port 2222 on ALL local host interfaces. In order to bind to only one interface, you may specify the host's IP address as `([<host_interface>:[host_port]])|(<host_port>):<container_port>[/udp]` as defined in the [podman port binding documentation](http://docs.podman.com/userguide/podmanlinks/). To expose a port without publishing it, specify only the port number (e.g., `80`).
 
 
 #### volumes:
@@ -136,7 +136,7 @@ when running the container
 
 ### Upgrading Discourse
 
-The Docker setup gives you multiple upgrade options:
+The Podman setup gives you multiple upgrade options:
 
 1. Use the front end at http://yoursite.com/admin/upgrade to upgrade an already running image.
 
@@ -161,7 +161,7 @@ On Ubuntu, install the `ufw` or `iptables-persistent` package to manage firewall
 
 ### Email
 
-For a Discourse instance to function properly Email must be set up. Use the `SMTP_URL` env var to set your SMTP address, see sample templates for an example. The Docker image does not contain postfix, exim or another MTA, it was omitted because it is very tricky to set up correctly.
+For a Discourse instance to function properly Email must be set up. Use the `SMTP_URL` env var to set your SMTP address, see sample templates for an example. The Podman image does not contain postfix, exim or another MTA, it was omitted because it is very tricky to set up correctly.
 
 ### Troubleshooting
 
@@ -192,8 +192,8 @@ installs you can ensure they are in sync by looking at `/etc/passwd` and
 
 ### Advanced topics
 
-- [Setting up SSL with Discourse Docker](https://meta.discourse.org/t/allowing-ssl-for-your-discourse-docker-setup/13847)
-- [Multisite configuration with Docker](https://meta.discourse.org/t/multisite-configuration-with-docker/14084)
+- [Setting up SSL with Discourse Podman](https://meta.discourse.org/t/allowing-ssl-for-your-discourse-podman-setup/13847)
+- [Multisite configuration with Podman](https://meta.discourse.org/t/multisite-configuration-with-podman/14084)
 - [Linking containers for a multiple container setup](https://meta.discourse.org/t/linking-containers-for-a-multiple-container-setup/20867)
 - [Using Rubygems mirror to improve connection problem in China](https://meta.discourse.org/t/replace-rubygems-org-with-taobao-mirror-to-resolve-network-error-in-china/21988/1)
 

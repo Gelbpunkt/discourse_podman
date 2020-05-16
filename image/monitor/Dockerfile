@@ -8,6 +8,6 @@ FROM samsaffron/discourse_base:1.0.7
 #LABEL maintainer="Sam Saffron \"https://twitter.com/samsaffron\""
 
 ADD src/monitor.rb src/monitor.rb
-RUN gem install statsd-ruby docker-api
+RUN gem install statsd-ruby podman-api
 
 CMD ruby src/monitor.rb

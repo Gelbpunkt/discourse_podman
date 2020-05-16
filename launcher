@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 
 usage () {
-  echo "Usage: launcher COMMAND CONFIG [--skip-prereqs] [--docker-args STRING]"
+  echo "Usage: launcher COMMAND CONFIG [--skip-prereqs] [--podman-args STRING]"
   echo "Commands:"
   echo "    start:       Start/initialize a container"
   echo "    stop:        Stop a running container"
   echo "    restart:     Restart a container"
   echo "    destroy:     Stop and remove a container"
   echo "    enter:       Open a shell to run commands inside the container"
-  echo "    logs:        View the Docker logs for a container"
+  echo "    logs:        View the Podman logs for a container"
   echo "    bootstrap:   Bootstrap a container for the config based on a template"
   echo "    run:         Run the given command with the config in the context of the last bootstrapped image"
   echo "    rebuild:     Rebuild a container (destroy old, bootstrap, start new)"
   echo "    cleanup:     Remove all containers that have stopped for > 24 hours"
-  echo "    start-cmd:   Generate docker command used to start container"
+  echo "    start-cmd:   Generate podman command used to start container"
   echo
   echo "Options:"
   echo "    --skip-prereqs             Don't check launcher prerequisites"
-  echo "    --docker-args              Extra arguments to pass when running docker"
+  echo "    --podman-args              Extra arguments to pass when running podman"
   echo "    --skip-mac-address         Don't assign a mac address"
   echo "    --run-image                Override the image used for running the container"
   exit 1
@@ -49,7 +49,7 @@ while [ ${#} -gt 0 ]; do
   --skip-mac-address)
     SKIP_MAC_ADDRESS="1"
     ;;
-  --docker-args)
+  --podman-args)
     user_args_argv="$2"
     user_args="$user_args_argv"
     shift
@@ -68,7 +68,7 @@ if [ -z "$command" -o -z "$config" -a "$command" != "cleanup" ]; then
   exit 1
 fi
 
-# Docker doesn't like uppercase characters, spaces or special characters, catch it now before we build everything out and then find out
+# Podman doesn't like uppercase characters, spaces or special characters, catch it now before we build everything out and then find out
 re='[[:upper:]/ !@#$%^&*()+~`=]'
 if [[ $config =~ $re ]];
   then
@@ -80,8 +80,8 @@ fi
 
 cd "$(dirname "$0")"
 
-docker_min_version='17.03.1'
-docker_rec_version='17.06.2'
+podman_min_version='1.9.1'
+podman_rec_version='1.9.1'
 git_min_version='1.8.0'
 git_rec_version='1.8.0'
 
@@ -89,7 +89,7 @@ config_file=containers/"$config".yml
 cidbootstrap=cids/"$config"_bootstrap.cid
 local_discourse=local_discourse
 image="discourse/base:2.0.20200512-1735"
-docker_path=`which docker.io 2> /dev/null || which docker`
+podman_path=`which podman`
 git_path=`which git`
 
 if [ "${SUPERVISED}" = "true" ]; then
@@ -100,17 +100,17 @@ else
   attach_on_run="-d"
 fi
 
-if [ -n "$DOCKER_HOST" ]; then
-  docker_ip=`sed -e 's/^tcp:\/\/\(.*\):.*$/\1/' <<< "$DOCKER_HOST"`
+if [ -n "$PODMAN_HOST" ]; then
+  podman_ip=`sed -e 's/^tcp:\/\/\(.*\):.*$/\1/' <<< "$PODMAN_HOST"`
 elif [ -x "$(which ip 2>/dev/null)" ]; then
-  docker_ip=`ip addr show docker0 | \
+  podman_ip=`ip addr show cni-podman0 | \
                   grep 'inet ' | \
                   awk '{ split($2,a,"/"); print a[1] }';`
 else
-  docker_ip=`ifconfig | \
+  podman_ip=`ifconfig | \
                   grep -B1 "inet addr" | \
                   awk '{ if ( $1 == "inet" ) { print $2 } else if ( $2 == "Link" ) { printf "%s:" ,$1 } }' | \
-                  grep docker0 | \
+                  grep cni-podman0 | \
                   awk -F: '{ print $3 }';`
 fi
 
@@ -138,56 +138,56 @@ compare_version() {
 }
 
 
-install_docker() {
-  echo "Docker is not installed, you will need to install Docker in order to run Launcher"
-  echo "See https://docs.docker.com/installation/"
+install_podman() {
+  echo "Podman is not installed, you will need to install Podman in order to run Launcher"
+  echo "See https://docs.podman.com/installation/"
   exit 1
 }
 
 check_prereqs() {
 
-  if [ -z $docker_path ]; then
-    install_docker
+  if [ -z $podman_path ]; then
+    install_podman
   fi
 
-  # 1. docker daemon running?
+  # 1. podman daemon running?
   # we send stderr to /dev/null cause we don't care about warnings,
   # it usually complains about swap which does not matter
-  test=`$docker_path info 2> /dev/null`
+  test=`$podman_path info 2> /dev/null`
   if [[ $? -ne 0 ]] ; then
-    echo "Cannot connect to the docker daemon - verify it is running and you have access"
+    echo "Cannot connect to the podman daemon - verify it is running and you have access"
     exit 1
   fi
 
   # 2. running an approved storage driver?
-  if ! $docker_path info 2> /dev/null | egrep -q 'Storage Driver: (aufs|zfs|overlay2)$'; then
-    echo "Your Docker installation is not using a supported storage driver.  If we were to proceed you may have a broken install."
+  if ! $podman_path info 2> /dev/null | egrep -q 'graphDriverName: (aufs|zfs|overlay2|overlay)$'; then
+    echo "Your Podman installation is not using a supported storage driver.  If we were to proceed you may have a broken install."
     echo "aufs is the recommended storage driver, although zfs and overlay2 may work as well."
     echo "Other storage drivers are known to be problematic."
-    echo "You can tell what filesystem you are using by running \"docker info\" and looking at the 'Storage Driver' line."
+    echo "You can tell what filesystem you are using by running \"podman info\" and looking at the 'Storage Driver' line."
     echo
     echo "If you wish to continue anyway using your existing unsupported storage driver,"
     echo "read the source code of launcher and figure out how to bypass this check."
     exit 1
   fi
 
-  # 3. running recommended docker version
-  test=($($docker_path --version))  # Get docker version string
+  # 3. running recommended podman version
+  test=($($podman_path --version))  # Get podman version string
   test=${test[2]//,/}  # Get version alone and strip comma if exists
 
-  # At least minimum docker version
-  if compare_version "${docker_min_version}" "${test}"; then
-    echo "ERROR: Docker version ${test} not supported, please upgrade to at least ${docker_min_version}, or recommended ${docker_rec_version}"
+  # At least minimum podman version
+  if compare_version "${podman_min_version}" "${test}"; then
+    echo "ERROR: Podman version ${test} not supported, please upgrade to at least ${podman_min_version}, or recommended ${podman_rec_version}"
     exit 1
   fi
 
-  # Recommend newer docker version
-  if compare_version "${docker_rec_version}" "${test}"; then
-    echo "WARNING: Docker version ${test} deprecated, recommend upgrade to ${docker_rec_version} or newer."
+  # Recommend newer podman version
+  if compare_version "${podman_rec_version}" "${test}"; then
+    echo "WARNING: Podman version ${test} deprecated, recommend upgrade to ${podman_rec_version} or newer."
   fi
 
-  # 4. discourse docker image is downloaded
-  test=`$docker_path images | awk '{print $1 ":" $2 }' | grep "$image"`
+  # 4. discourse podman image is downloaded
+  test=`$podman_path images | awk '{print $1 ":" $2 }' | grep "$image"`
 
   if [ -z "$test" ]; then
     echo
@@ -214,29 +214,29 @@ check_prereqs() {
   fi
 
   # 6. able to attach stderr / out / tty
-  test=`$docker_path run $user_args -i --rm -a stdout -a stderr $image echo working`
+  test=`$podman_path run $user_args -i --rm -a stdout -a stderr $image echo working`
   if [[ "$test" =~ "working" ]] ; then : ; else
-    echo "Your Docker installation is not working correctly"
+    echo "Your Podman installation is not working correctly"
     echo
-    echo "See: https://meta.discourse.org/t/docker-error-on-bootstrap/13657/18?u=sam"
+    echo "See: https://meta.discourse.org/t/podman-error-on-bootstrap/13657/18?u=sam"
     exit 1
   fi
 
-  # 7. enough space for the bootstrap on docker folder
-  folder=`$docker_path info --format '{{.DockerRootDir}}'`
-  safe_folder=${folder:-/var/lib/docker}
+  # 7. enough space for the bootstrap on podman folder
+  folder=`$podman_path info --format={{".Store.GraphRoot"}}`
+  safe_folder=${folder:-/var/lib/podman}
   test=$(($(stat -f --format="%a*%S" $safe_folder)/1024**3 < 5))
   if [[ $test -ne 0 ]] ; then
     echo "You have less than 5GB of free space on the disk where $safe_folder is located. You will need more space to continue"
     df -h $safe_folder
     echo
     if tty >/dev/null; then
-      read -p "Would you like to attempt to recover space by cleaning docker images and containers in the system?(y/N)" -n 1 -r
+      read -p "Would you like to attempt to recover space by cleaning podman images and containers in the system?(y/N)" -n 1 -r
       echo
       if [[ $REPLY =~ ^[Yy]$ ]]
       then
-        $docker_path container prune --force --filter until=1h >/dev/null
-        $docker_path image prune --all --force --filter until=1h >/dev/null
+        $podman_path container prune --force --filter until=1h >/dev/null
+        $podman_path image prune --all --force --filter until=1h >/dev/null
         echo "If the cleanup was successful, you may try again now"
       fi
     fi
@@ -267,7 +267,7 @@ host_run() {
   end
 RUBY
 
-  host_run=`cat $config_file | $docker_path run $user_args --rm -i -a stdout -a stdin $image ruby -e "$env_ruby"`
+  host_run=`cat $config_file | $podman_path run $user_args --rm -i -a stdout -a stdin $image ruby -e "$env_ruby"`
 
   while [ "$host_run" ] ; do
     iter=${host_run%%--SEP--*}
@@ -281,17 +281,17 @@ RUBY
 
 
 set_volumes() {
-  volumes=`cat $config_file | $docker_path run $user_args --rm -i -a stdout -a stdin $image ruby -e \
+  volumes=`cat $config_file | $podman_path run $user_args --rm -i -a stdout -a stdin $image ruby -e \
         "require 'yaml'; puts YAML.load(STDIN.readlines.join)['volumes'].map{|v| '-v ' << v['volume']['host'] << ':' << v['volume']['guest'] << ' '}.join"`
 }
 
 set_links() {
-    links=`cat $config_file | $docker_path run $user_args --rm -i -a stdout -a stdin $image ruby -e \
+    links=`cat $config_file | $podman_path run $user_args --rm -i -a stdout -a stdin $image ruby -e \
         "require 'yaml'; puts YAML.load(STDIN.readlines.join)['links'].map{|l| '--link ' << l['link']['name'] << ':' << l['link']['alias'] << ' '}.join"`
 }
 
 find_templates() {
-    local templates=`cat $1 | $docker_path run $user_args --rm -i -a stdin -a stdout $image ruby -e \
+    local templates=`cat $1 | $podman_path run $user_args --rm -i -a stdin -a stdout $image ruby -e \
       "require 'yaml'; puts YAML.load(STDIN.readlines.join)['templates']"`
 
     local arrTemplates=${templates// / }
@@ -354,7 +354,7 @@ RUBY
     tmp_input_file=$(mktemp)
 
     echo "$input" > "$tmp_input_file"
-    raw=`exec cat "$tmp_input_file" | $docker_path run $user_args --rm -i -a stdin -a stdout $image ruby -e "$env_ruby"`
+    raw=`exec cat "$tmp_input_file" | $podman_path run $user_args --rm -i -a stdin -a stdout $image ruby -e "$env_ruby"`
 
     rm -f "$tmp_input_file"
 
@@ -398,7 +398,7 @@ RUBY
     tmp_input_file=$(mktemp)
 
     echo "$input" > "$tmp_input_file"
-    raw=`exec cat "$tmp_input_file" | $docker_path run $user_args --rm -i -a stdin -a stdout $image ruby -e "$labels_ruby"`
+    raw=`exec cat "$tmp_input_file" | $podman_path run $user_args --rm -i -a stdin -a stdout $image ruby -e "$labels_ruby"`
 
     rm -f "$tmp_input_file"
 
@@ -442,7 +442,7 @@ RUBY
     tmp_input_file=$(mktemp)
 
     echo "$input" > "$tmp_input_file"
-    raw=`exec cat "$tmp_input_file" | $docker_path run $user_args --rm -i -a stdin -a stdout $image ruby -e "$ports_ruby"`
+    raw=`exec cat "$tmp_input_file" | $podman_path run $user_args --rm -i -a stdin -a stdout $image ruby -e "$ports_ruby"`
 
     rm -f "$tmp_input_file"
 
@@ -465,13 +465,13 @@ RUBY
    merge_user_args
 }
 
-if [ -z $docker_path ]; then
-  install_docker
+if [ -z $podman_path ]; then
+  install_podman
 fi
 
 [ "$command" == "cleanup" ] && {
-  $docker_path container prune --filter until=1h
-  $docker_path image prune --all --filter until=1h
+  $podman_path container prune --filter until=1h
+  $podman_path image prune --all --filter until=1h
 
   if [ -d /var/discourse/shared/standalone/postgres_data_old ]; then
     echo
@@ -498,12 +498,12 @@ if [ ! "$command" == "setup" ]; then
   fi
 fi
 
-docker_version=($($docker_path --version))
-docker_version=${test[2]//,/}
+podman_version=($($podman_path --version))
+podman_version=${test[2]//,/}
 restart_policy=${restart_policy:---restart=always}
 
 set_existing_container(){
-  existing=`$docker_path ps -a | awk '{ print $1, $(NF) }' | grep " $config$" | awk '{ print $1 }'`
+  existing=`$podman_path ps -a | awk '{ print $1, $(NF) }' | grep " $config$" | awk '{ print $1 }'`
 }
 
 run_stop() {
@@ -514,7 +514,7 @@ run_stop() {
      then
        (
         set -x
-        $docker_path stop -t 10 $config
+        $podman_path stop -t 10 $config
        )
      else
        echo "$config was not started !"
@@ -524,7 +524,7 @@ run_stop() {
 }
 
 set_run_image() {
-  run_image=`cat $config_file | $docker_path run $user_args --rm -i -a stdin -a stdout $image ruby -e \
+  run_image=`cat $config_file | $podman_path run $user_args --rm -i -a stdin -a stdout $image ruby -e \
     "require 'yaml'; puts YAML.load(STDIN.readlines.join)['run_image']"`
 
   if [ -n "$user_run_image" ]; then
@@ -535,12 +535,12 @@ set_run_image() {
 }
 
 set_boot_command() {
-  boot_command=`cat $config_file | $docker_path run $user_args --rm -i -a stdin -a stdout $image ruby -e \
+  boot_command=`cat $config_file | $podman_path run $user_args --rm -i -a stdin -a stdout $image ruby -e \
     "require 'yaml'; puts YAML.load(STDIN.readlines.join)['boot_command']"`
 
   if [ -z "$boot_command" ]; then
 
-    no_boot_command=`cat $config_file | $docker_path run $user_args --rm -i -a stdin -a stdout $image ruby -e \
+    no_boot_command=`cat $config_file | $podman_path run $user_args --rm -i -a stdin -a stdout $image ruby -e \
       "require 'yaml'; puts YAML.load(STDIN.readlines.join)['no_boot_command']"`
 
     if [ -z "$no_boot_command" ]; then
@@ -550,13 +550,13 @@ set_boot_command() {
 }
 
 merge_user_args() {
-  local docker_args
+  local podman_args
 
-  docker_args=`cat $config_file | $docker_path run $user_args --rm -i -a stdout -a stdin $image ruby -e \
-          "require 'yaml'; puts YAML.load(STDIN.readlines.join)['docker_args']"`
+  podman_args=`cat $config_file | $podman_path run $user_args --rm -i -a stdout -a stdin $image ruby -e \
+          "require 'yaml'; puts YAML.load(STDIN.readlines.join)['podman_args']"`
 
-  if [[ -n "$docker_args" ]]; then
-    user_args="$user_args_argv $docker_args"
+  if [[ -n "$podman_args" ]]; then
+    user_args="$user_args_argv $podman_args"
   fi
 }
 
@@ -564,7 +564,7 @@ run_start() {
 
    if [ -z "$START_CMD_ONLY" ]
    then
-     existing=`$docker_path ps | awk '{ print $1, $(NF) }' | grep " $config$" | awk '{ print $1 }'`
+     existing=`$podman_path ps | awk '{ print $1, $(NF) }' | grep " $config$" | awk '{ print $1 }'`
      echo $existing
      if [ ! -z $existing ]
      then
@@ -572,13 +572,13 @@ run_start() {
        exit 0
      fi
 
-     existing=`$docker_path ps -a | awk '{ print $1, $(NF) }' | grep " $config$" | awk '{ print $1 }'`
+     existing=`$podman_path ps -a | awk '{ print $1, $(NF) }' | grep " $config$" | awk '{ print $1 }'`
      if [ ! -z $existing ]
      then
        echo "starting up existing container"
        (
          set -x
-         $docker_path start $config
+         $podman_path start $config
        )
        exit 0
      fi
@@ -595,7 +595,7 @@ run_start() {
    # get hostname and settings from container configuration
    for envar in "${env[@]}"
    do
-     if [[ $envar == DOCKER_USE_HOSTNAME* ]] || [[ $envar == DISCOURSE_HOSTNAME* ]]
+     if [[ $envar == PODMAN_USE_HOSTNAME* ]] || [[ $envar == DISCOURSE_HOSTNAME* ]]
      then
        # use as environment variable
        eval $envar
@@ -605,7 +605,7 @@ run_start() {
    (
      hostname=`hostname -s`
      # overwrite hostname
-     if [ "$DOCKER_USE_HOSTNAME" = "true" ]
+     if [ "$PODMAN_USE_HOSTNAME" = "true" ]
      then
        hostname=$DISCOURSE_HOSTNAME
      else
@@ -613,23 +613,23 @@ run_start() {
      fi
 
      # we got to normalize so we only have allowed strings, this is more comprehensive but lets see how bash does first
-     # hostname=`$docker_path run $user_args --rm $image ruby -e 'print ARGV[0].gsub(/[^a-zA-Z-]/, "-")' $hostname`
-     # docker added more hostname rules
+     # hostname=`$podman_path run $user_args --rm $image ruby -e 'print ARGV[0].gsub(/[^a-zA-Z-]/, "-")' $hostname`
+     # podman added more hostname rules
      hostname=${hostname//_/-}
 
 
      if [ -z "$SKIP_MAC_ADDRESS" ] ; then
-      mac_address="--mac-address $($docker_path run $user_args -i --rm -a stdout -a stderr $image /bin/sh -c "echo $hostname | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/'")"
+      mac_address="--mac-address $($podman_path run $user_args -i --rm -a stdout -a stderr $image /bin/sh -c "echo $hostname | md5sum | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/'")"
      fi
 
      if [ ! -z "$START_CMD_ONLY" ] ; then
-       docker_path="true"
+       podman_path="true"
      fi
 
      set -x
 
-     $docker_path run --shm-size=512m $links $attach_on_run $restart_policy "${env[@]}" "${labels[@]}" -h "$hostname" \
-        -e DOCKER_HOST_IP="$docker_ip" --name $config -t "${ports[@]}" $volumes $mac_address $user_args \
+     $podman_path run --shm-size=512m $links $attach_on_run $restart_policy "${env[@]}" "${labels[@]}" -h "$hostname" \
+        -e PODMAN_HOST_IP="$podman_ip" --name $config -t "${ports[@]}" $volumes $mac_address $user_args \
         $run_image $boot_command
 
    )
@@ -644,7 +644,7 @@ run_run() {
   set_run_image
 
   unset ERR
-  (exec $docker_path run --rm --shm-size=512m $user_args $links "${env[@]}" -e DOCKER_HOST_IP="$docker_ip" -i -a stdin -a stdout -a stderr $volumes $run_image \
+  (exec $podman_path run --rm --shm-size=512m $user_args $links "${env[@]}" -e PODMAN_HOST_IP="$podman_ip" -i -a stdin -a stdout -a stderr $volumes $run_image \
     /bin/bash -c "$run_command") || ERR=$?
 
   if [[ $ERR > 0 ]]; then
@@ -657,14 +657,14 @@ run_bootstrap() {
 
   # Is the image available?
   # If not, pull it here so the user is aware what's happening.
-  $docker_path history $image >/dev/null 2>&1 || $docker_path pull $image
+  $podman_path history $image >/dev/null 2>&1 || $podman_path pull $image
 
   set_template_info
 
-  base_image=`cat $config_file | $docker_path run $user_args --rm -i -a stdin -a stdout $image ruby -e \
+  base_image=`cat $config_file | $podman_path run $user_args --rm -i -a stdin -a stdout $image ruby -e \
     "require 'yaml'; puts YAML.load(STDIN.readlines.join)['base_image']"`
 
-  update_pups=`cat $config_file | $docker_path run $user_args --rm -i -a stdin -a stdout $image ruby -e \
+  update_pups=`cat $config_file | $podman_path run $user_args --rm -i -a stdin -a stdout $image ruby -e \
     "require 'yaml'; puts YAML.load(STDIN.readlines.join)['update_pups']"`
 
   if [[ ! X"" = X"$base_image" ]]; then
@@ -689,7 +689,7 @@ run_bootstrap() {
   tmp_input_file=$(mktemp)
 
   echo "$input" > "$tmp_input_file"
-  (exec cat "$tmp_input_file" | $docker_path run --shm-size=512m $user_args $links "${env[@]}" -e DOCKER_HOST_IP="$docker_ip" --cidfile $cidbootstrap -i -a stdin -a stdout -a stderr $volumes $image \
+  (exec cat "$tmp_input_file" | $podman_path run --shm-size=512m $user_args $links "${env[@]}" -e PODMAN_HOST_IP="$podman_ip" --cidfile $cidbootstrap -i -a stdin -a stdout -a stderr $volumes $image \
     /bin/bash -c "$run_command") || ERR=$?
 
   rm -f "$tmp_input_file"
@@ -697,7 +697,7 @@ run_bootstrap() {
   unset FAILED
   # magic exit code that indicates a retry
   if [[ "$ERR" == 77 ]]; then
-    $docker_path rm `cat $cidbootstrap`
+    $podman_path rm `cat $cidbootstrap`
     rm $cidbootstrap
     exit 77
   elif [[ "$ERR" > 0 ]]; then
@@ -706,11 +706,11 @@ run_bootstrap() {
 
   if [[ $FAILED = "TRUE" ]]; then
     if [[ ! -z "$DEBUG" ]]; then
-      $docker_path commit `cat $cidbootstrap` $local_discourse/$config-debug || echo 'FAILED TO COMMIT'
+      $podman_path commit `cat $cidbootstrap` $local_discourse/$config-debug || echo 'FAILED TO COMMIT'
       echo "** DEBUG ** Maintaining image for diagnostics $local_discourse/$config-debug"
     fi
 
-    $docker_path rm `cat $cidbootstrap`
+    $podman_path rm `cat $cidbootstrap`
     rm $cidbootstrap
     echo "** FAILED TO BOOTSTRAP ** please scroll up and look for earlier error messages, there may be more than one."
     echo "./discourse-doctor may help diagnose the problem."
@@ -719,8 +719,8 @@ run_bootstrap() {
 
   sleep 5
 
-  $docker_path commit `cat $cidbootstrap` $local_discourse/$config || echo 'FAILED TO COMMIT'
-  $docker_path rm `cat $cidbootstrap` && rm $cidbootstrap
+  $podman_path commit `cat $cidbootstrap` $local_discourse/$config || echo 'FAILED TO COMMIT'
+  $podman_path rm `cat $cidbootstrap` && rm $cidbootstrap
 }
 
 case "$command" in
@@ -736,7 +736,7 @@ case "$command" in
       ;;
 
   enter)
-      exec $docker_path exec -it $config /bin/bash --login
+      exec $podman_path exec -it $config /bin/bash --login
       ;;
 
   stop)
@@ -746,7 +746,7 @@ case "$command" in
 
   logs)
 
-      $docker_path logs $config
+      $podman_path logs $config
       exit 0
       ;;
 
@@ -806,7 +806,7 @@ case "$command" in
           echo "Stopping old container"
           (
             set -x
-            $docker_path stop -t 60 $config
+            $podman_path stop -t 60 $config
           )
       fi
 
@@ -817,7 +817,7 @@ case "$command" in
           echo "Removing old container"
           (
             set -x
-            $docker_path rm $config
+            $podman_path rm $config
           )
       fi
 
@@ -827,7 +827,7 @@ case "$command" in
 
 
   destroy)
-      (set -x; $docker_path stop -t 10 $config && $docker_path rm $config) || (echo "$config was not found" && exit 0)
+      (set -x; $podman_path stop -t 10 $config && $podman_path rm $config) || (echo "$config was not found" && exit 0)
       exit 0
       ;;
 esac

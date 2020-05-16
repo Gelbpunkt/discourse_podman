@@ -67,17 +67,17 @@ check_ip_match() {
   fi
 }
 
-check_docker_is_installed() {
-  log -e "\n==================== DOCKER INFO ===================="
-  docker_path="$(which docker.io || which docker)"
-  if [ -z $docker_path ]; then
-    log "Docker is not installed. Have you installed Discourse at all?"
+check_podman_is_installed() {
+  log -e "\n==================== PODMAN INFO ===================="
+  podman_path="$(which podman)"
+  if [ -z $podman_path ]; then
+    log "Podman is not installed. Have you installed Discourse at all?"
     log "Perhaps you're looking for ./discourse-setup ."
     log "There is no point in continuing."
     exit
   else
-    log -e "DOCKER VERSION: $(docker --version)"
-    log -e "\nDOCKER PROCESSES (docker ps -a)\n\n$(sudo docker ps -a)\n"
+    log -e "PODMAN VERSION: $(podman --version)"
+    log -e "\nPODMAN PROCESSES (podman ps -a)\n\n$(sudo podman ps -a)\n"
   fi
 }
 
@@ -97,13 +97,13 @@ check_disk_and_memory() {
 
   log -e "\n==================== DISK SPACE CHECK ===================="
   log "---------- OS Disk Space ----------"
-  log "$(df -h / /var/discourse /var/lib/docker /var/lib/docker/* | uniq)"
+  log "$(df -h / /var/discourse /var/lib/podman /var/lib/podman/* | uniq)"
 
   if [ "$version" != "NOT FOUND" ]
   then
     log
     log "---------- Container Disk Space ----------"
-    log "$(sudo docker exec -w /var/www/discourse -i $app_name df -h / /shared/ /shared/postgres_data /shared/redis_data /shared/backups /var/log | uniq)"
+    log "$(sudo podman exec -w /var/www/discourse -i $app_name df -h / /shared/ /shared/postgres_data /shared/redis_data /shared/backups /var/log | uniq)"
   fi
 
   log -e "\n==================== DISK INFORMATION ===================="
@@ -119,7 +119,7 @@ check_disk_and_memory() {
     log "Please free up some space, or expand your disk, before continuing."
     log
     log "Run \'apt-get autoremove && apt-get autoclean\' to clean up unused"
-    log "packages and \'./launcher cleanup\' to remove stale Docker containers."
+    log "packages and \'./launcher cleanup\' to remove stale Podman containers."
     exit 1
   fi
 }
@@ -230,7 +230,7 @@ check_email() {
   if [ "$new_value" != "n" ] && [ "$new_value" != "N" ]
   then
     log "Sending mail to $EMAIL. . . "
-    log "$(sudo docker exec -w /var/www/discourse -i $app_name rake emails:test[$EMAIL])"
+    log "$(sudo podman exec -w /var/www/discourse -i $app_name rake emails:test[$EMAIL])"
   else
     log "Mail test skipped."
   fi
@@ -256,10 +256,10 @@ get_yml_file() {
   fi
 }
 
-check_docker() {
-  docker ps | tail -n +2 > /tmp/$UUID-docker.txt
+check_podman() {
+  podman ps | tail -n +2 > /tmp/$UUID-podman.txt
 
-  if grep $app_name /tmp/$UUID-docker.txt
+  if grep $app_name /tmp/$UUID-podman.txt
   then
     log -e "\nDiscourse container $app_name is running"
   else
@@ -270,8 +270,8 @@ check_docker() {
     # too hard to pass STDERR of ./launcher to log()
     ./launcher rebuild $app_name 2>&1 | tee -a $LOG_FILE
     log "==================== END REBUILD LOG ===================="
-    docker ps | tail -n +2 > /tmp/$UUID-docker.txt
-    if grep $app_name /tmp/$UUID-docker.txt
+    podman ps | tail -n +2 > /tmp/$UUID-podman.txt
+    if grep $app_name /tmp/$UUID-podman.txt
     then
       log -e "\nDiscourse container $app_name is now running."
       log ". . . waiting 30 seconds for container to crank up. . . "
@@ -285,8 +285,8 @@ check_docker() {
       NO_CONTAINER='y'
       log "Attempting to restart existing container. . . "
       ./launcher start $app_name 2>&1 | tee -a $LOG_FILE
-      docker ps | tail -n +2 > /tmp/$UUID-docker.txt
-      if grep $app_name /tmp/$UUID-docker.txt
+      podman ps | tail -n +2 > /tmp/$UUID-podman.txt
+      if grep $app_name /tmp/$UUID-podman.txt
       then
         log "Restarted the container."
         NO_CONTAINER='n'
@@ -320,7 +320,7 @@ print_done() {
     if [ $serve == 'Y' ]
     then
         cp $LOG_FILE shared/standalone/log/var-log/$DOCTOR_FILE
-        sudo docker exec -w /var/www/discourse -i $app_name cp /var/log/$DOCTOR_FILE  public
+        sudo podman exec -w /var/www/discourse -i $app_name cp /var/log/$DOCTOR_FILE  public
         log "The output of this program may be available at http://$DISCOURSE_HOSTNAME/$DOCTOR_FILE"
         log "You should inspect that file carefully before sharing the URL."
     else
@@ -360,8 +360,8 @@ cd $WORKING_DIR || exit
 initialize_log_file
 get_yml_file
 get_discourse_config
-check_docker_is_installed
-check_docker
+check_podman_is_installed
+check_podman
 check_plugins
 check_if_hostname_resolves_here
 check_disk_and_memory

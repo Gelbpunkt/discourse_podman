@@ -86,17 +86,17 @@ check_IP_match() {
 }
 
 ##
-## Do we have docker?
+## Do we have podman?
 ##
-check_and_install_docker () {
-  docker_path=`which docker.io || which docker`
-  if [ -z $docker_path ]; then
-    read  -p "Docker not installed. Enter to install from https://get.docker.com/ or Ctrl+C to exit"
-    curl https://get.docker.com/ | sh
+check_and_install_podman () {
+  podman_path=`which podman.io || which podman`
+  if [ -z $podman_path ]; then
+    read  -p "Podman not installed. Enter to install from https://get.podman.com/ or Ctrl+C to exit"
+    curl https://get.podman.com/ | sh
   fi
-  docker_path=`which docker.io || which docker`
-  if [ -z $docker_path ]; then
-    echo Docker install failed. Quitting.
+  podman_path=`which podman.io || which podman`
+  if [ -z $podman_path ]; then
+    echo Podman install failed. Quitting.
     exit
   fi
 }
@@ -197,7 +197,7 @@ check_disk_and_memory() {
     echo "Please free up some space, or expand your disk, before continuing."
     echo
     echo "Run \`apt-get autoremove && apt-get autoclean\` to clean up unused"
-    echo "packages and \`./launcher cleanup\` to remove stale Docker containers."
+    echo "packages and \`./launcher cleanup\` to remove stale Podman containers."
     exit 1
   fi
 
@@ -672,7 +672,7 @@ fi
 ## Check requirements before creating a copy of a config file we won't edit
 ##
 check_root
-check_and_install_docker
+check_and_install_podman
 check_disk_and_memory
 
 if [ -a "$web_file" ]

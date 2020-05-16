@@ -15,14 +15,14 @@ expose:
   - "80:80"   # http
   - "443:443" # https
 
-# Use 'links' key to link containers together, aka use Docker --link flag.
+# Use 'links' key to link containers together, aka use Podman --link flag.
 links:
   - link:
       name: data
       alias: data
 
-# any extra arguments for Docker?
-# docker_args:
+# any extra arguments for Podman?
+# podman_args:
 
 params:
   ## Which Git revision should this container use? (default: tests-passed)
@@ -41,7 +41,7 @@ env:
 
   ## Uncomment if you want the container to be started with the same
   ## hostname (-h option) as specified above (default "$hostname-$config")
-  #DOCKER_USE_HOSTNAME: true
+  #PODMAN_USE_HOSTNAME: true
 
   ## TODO: List of comma delimited emails that will be made admin and developer
   ## on initial signup example 'user1@example.com,user2@example.com'
@@ -85,7 +85,7 @@ hooks:
     - exec:
         cd: $home/plugins
         cmd:
-          - git clone https://github.com/discourse/docker_manager.git
+          - git clone https://github.com/discourse/podman_manager.git
 
 ## Remember, this is YAML syntax - you can only have one block with a name
 run:

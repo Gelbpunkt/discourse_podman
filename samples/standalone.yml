@@ -1,4 +1,4 @@
-## this is the all-in-one, standalone Discourse Docker container template
+## this is the all-in-one, standalone Discourse Podman container template
 ##
 ## After making changes to this file, you MUST rebuild
 ## /var/discourse/launcher rebuild app
@@ -50,7 +50,7 @@ env:
 
   ## Uncomment if you want the container to be started with the same
   ## hostname (-h option) as specified above (default "$hostname-$config")
-  #DOCKER_USE_HOSTNAME: true
+  #PODMAN_USE_HOSTNAME: true
 
   ## TODO: List of comma delimited emails that will be made admin and developer
   ## on initial signup example 'user1@example.com,user2@example.com'
@@ -72,7 +72,7 @@ env:
   ## see https://meta.discourse.org/t/14857 for details
   #DISCOURSE_CDN_URL: https://discourse-cdn.example.com
 
-## The Docker container is stateless; all data is stored in /shared
+## The Podman container is stateless; all data is stored in /shared
 volumes:
   - volume:
       host: /var/discourse/shared/standalone
@@ -88,7 +88,7 @@ hooks:
     - exec:
         cd: $home/plugins
         cmd:
-          - git clone https://github.com/discourse/docker_manager.git
+          - git clone https://github.com/discourse/podman_manager.git
 
 ## Any custom commands to run after building
 run:

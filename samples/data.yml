@@ -6,8 +6,8 @@ templates:
   - "templates/postgres.template.yml"
   - "templates/redis.template.yml"
 
-# any extra arguments for Docker?
-# docker_args:
+# any extra arguments for Podman?
+# podman_args:
 
 params:
   db_default_text_search_config: "pg_catalog.english"

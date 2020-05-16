@@ -104,7 +104,7 @@ RUN /tmp/install-pngquant
 ADD thpoff.c /src/thpoff.c
 RUN gcc -o /usr/local/sbin/thpoff /src/thpoff.c && rm /src/thpoff.c
 
-# clean up for docker squash
+# clean up for podman squash
 RUN   rm -fr /usr/share/man &&\
       rm -fr /usr/share/doc &&\
       rm -fr /usr/share/vim/vim74/tutor &&\

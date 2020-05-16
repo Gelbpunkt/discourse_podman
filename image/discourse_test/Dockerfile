@@ -32,4 +32,4 @@ RUN cd /var/www/discourse && sudo -E -u discourse -H bundle exec rake plugin:ins
 
 WORKDIR /var/www/discourse
 ENV LANG en_US.UTF-8
-ENTRYPOINT sudo -E -u discourse -H ruby script/docker_test.rb
+ENTRYPOINT sudo -E -u discourse -H ruby script/podman_test.rb

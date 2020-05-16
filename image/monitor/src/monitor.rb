@@ -1,9 +1,9 @@
 require 'statsd-ruby'
-require 'docker'
+require 'podman'
 
 $statsd = Statsd.new '10.0.0.1', 8125
 
-module Docker
+module Podman
   class CloseConnectionError < StandardError; end
   class Container
     def name
@@ -23,7 +23,7 @@ module Docker
 
       Excon.get(connection.url + path[1..-1], options) rescue CloseConnectionError
 
-      Docker::Util.parse_json(result)
+      Podman::Util.parse_json(result)
     end
   end
 end
@@ -70,10 +70,10 @@ def analyze_container(container)
 end
 
 def containers
-  Docker::Container.all
+  Podman::Container.all
 end
 
-hostname = Docker.info["Name"]
+hostname = Podman.info["Name"]
 
 STDERR.puts "#{Time.now} Starting Monitor"
 
